@@ -96,5 +96,5 @@ def scan_tokens():
 if __name__ == "__main__":
     print("🚀 Trading bot is running...")
     app.run(host="0.0.0.0", port=8080, debug=True)
-``
+
 
