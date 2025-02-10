@@ -21,18 +21,6 @@ def send_telegram_alert(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
-# ✅ Function to fetch OHLCV (candlestick) data from Binance
-def fetch_ohlcv(symbol, timeframe, limit=100):
-    try:
-        time.sleep(2)  # Avoid API rate limits
-        ohlcv = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
-        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return df
-    except Exception as e:
-        print(f"Error fetching OHLCV for {symbol}: {str(e)}")
-        return None
-
 # ✅ Function to scan for trading opportunities
 def find_gems():
     try:
@@ -45,9 +33,13 @@ def find_gems():
 
         for symbol, row in usdt_pairs.items():
             if 'quoteVolume' not in row or 'open' not in row or 'last' not in row:
-                continue
+                continue  # ✅ Skip if required data is missing
 
-            # Calculate percent change
+            if row['last'] is None or row['open'] is None:
+                print(f"⚠️ Skipping {symbol}: Missing 'last' or 'open' price data.")
+                continue  # ✅ Skip tokens with missing price data
+
+            # ✅ Safe calculation to prevent NoneType errors
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
             # ✅ **Lowered thresholds for more signals**
@@ -96,5 +88,3 @@ def scan_tokens():
 if __name__ == "__main__":
     print("🚀 Trading bot is running...")
     app.run(host="0.0.0.0", port=8080, debug=True)
-
-
