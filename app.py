@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify
 import ccxt
 import pandas as pd
@@ -7,8 +8,8 @@ import numpy as np
 app = Flask(__name__)
 
 # ✅ Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN = "7783208307:AAEWER2ylltWGd6g5I9XAH17yNmp7Imivbo"
-TELEGRAM_CHAT_ID = "1002324780762"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # ✅ Binance API Initialization
 binance = ccxt.binance()
@@ -55,21 +56,21 @@ def calculate_goals(price, percent_change, rsi, macd, macd_signal):
         goal_3 = round(price * 1.40, 4)  # +40%
         stop_loss = round(price * 0.92, 4)  # -8%
         strategy_used = "Momentum Breakout 🚀"
-    
+
     elif 10 < percent_change <= 20 and macd > macd_signal:  # 📈 Trend Continuation
         goal_1 = round(price * 1.08, 4)  # +8%
         goal_2 = round(price * 1.15, 4)  # +15%
         goal_3 = round(price * 1.25, 4)  # +25%
         stop_loss = round(price * 0.94, 4)  # -6%
         strategy_used = "Trend Continuation 📈"
-    
+
     elif rsi < 30 and macd < macd_signal:  # 🔍 Reversal Pattern
         goal_1 = round(price * 1.06, 4)  # +6%
         goal_2 = round(price * 1.12, 4)  # +12%
         goal_3 = round(price * 1.18, 4)  # +18%
         stop_loss = round(price * 0.95, 4)  # -5%
         strategy_used = "Reversal Pattern 🔍"
-    
+
     else:  # Default conservative strategy
         goal_1 = round(price * 1.05, 4)  # +5%
         goal_2 = round(price * 1.10, 4)  # +10%
@@ -108,24 +109,15 @@ def find_gems():
             )
 
             message = (
-                f"*{strategy_used} Detected!* 🔥"
-"
-                f"📌 *Token:* `{symbol}`
-"
-                f"💰 *Entry Price:* `{entry_price:.4f} USDT`
-"
-                f"📊 *RSI:* `{rsi:.2f}` | *MACD:* `{macd:.4f}`
-"
-                f"🎯 *Goals:*
-"
-                f"  1️⃣ `{goal_1} USDT`
-"
-                f"  2️⃣ `{goal_2} USDT`
-"
-                f"  3️⃣ `{goal_3} USDT`
-"
-                f"⛔ *Stop Loss:* `{stop_loss} USDT`
-"
+                f"*{strategy_used} Detected!* 🔥\n"
+                f"📌 *Token:* `{symbol}`\n"
+                f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
+                f"📊 *RSI:* `{rsi:.2f}` | *MACD:* `{macd:.4f}`\n"
+                f"🎯 *Goals:*\n"
+                f"  1️⃣ `{goal_1} USDT`\n"
+                f"  2️⃣ `{goal_2} USDT`\n"
+                f"  3️⃣ `{goal_3} USDT`\n"
+                f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
             )
 
             send_telegram_alert(message)
