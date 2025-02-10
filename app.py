@@ -21,6 +21,57 @@ def send_telegram_alert(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
+# ✅ Function to fetch OHLCV (candlestick) data from Binance
+def fetch_ohlcv(symbol, timeframe, limit=100):
+    try:
+        time.sleep(2)  # Avoid API rate limits
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe, limit=limit)
+        df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        return df
+    except Exception as e:
+        print(f"Error fetching OHLCV for {symbol}: {str(e)}")
+        return None
+
+# ✅ Function to determine dynamic goals based on strategy
+def calculate_goals(price, percent_change):
+    """
+    Determine target goals dynamically based on market strategy.
+    - Short-term (1-15% increase) → 1-day timeframe
+    - Mid-term (15-45% increase) → 1-day timeframe
+    - Long-term (45-150% increase) → 1-week timeframe
+    """
+
+    if percent_change > 20:
+        strategy_used = "Momentum Breakout 🚀"
+        goal_1 = round(price * 1.12, 4)  # +12%
+        goal_2 = round(price * 1.35, 4)  # +35%
+        goal_3 = round(price * 2.00, 4)  # +100%
+        stop_loss = round(price * 0.90, 4)  # -10%
+
+    elif percent_change > 10:
+        strategy_used = "Trend Continuation 📈"
+        goal_1 = round(price * 1.08, 4)  # +8%
+        goal_2 = round(price * 1.25, 4)  # +25%
+        goal_3 = round(price * 1.75, 4)  # +75%
+        stop_loss = round(price * 0.92, 4)  # -8%
+
+    elif percent_change < -5:
+        strategy_used = "Reversal Opportunity 🔄"
+        goal_1 = round(price * 1.05, 4)  # +5%
+        goal_2 = round(price * 1.18, 4)  # +18%
+        goal_3 = round(price * 1.50, 4)  # +50%
+        stop_loss = round(price * 0.93, 4)  # -7%
+
+    else:
+        strategy_used = "Standard Investment ✅"
+        goal_1 = round(price * 1.03, 4)  # +3%
+        goal_2 = round(price * 1.12, 4)  # +12%
+        goal_3 = round(price * 1.50, 4)  # +50%
+        stop_loss = round(price * 0.95, 4)  # -5%
+
+    return goal_1, goal_2, goal_3, stop_loss, strategy_used
+
 # ✅ Function to scan for trading opportunities
 def find_gems():
     try:
@@ -46,14 +97,21 @@ def find_gems():
             if percent_change > 3 and row['quoteVolume'] > 1000000:  
                 entry_price = row['last']
 
+                # ✅ Calculate dynamic goals
+                goal_1, goal_2, goal_3, stop_loss, strategy_used = calculate_goals(entry_price, percent_change)
+
                 # ✅ **Logging detected coins**
-                print(f"🚀 {symbol} detected with {percent_change:.2f}% change and {row['quoteVolume']} volume.")
+                print(f"🚀 {strategy_used}: {symbol} detected with {percent_change:.2f}% change.")
 
                 message = (
-                    f"🔥 *New Trading Signal Detected!*\n"
+                    f"🔥 *{strategy_used}*\n"
                     f"📌 *Token:* `{symbol}`\n"
                     f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"📊 *24h Change:* `{percent_change:.2f}%`\n"
+                    f"🎯 *Goals:*\n"
+                    f"  1️⃣ `{goal_1} USDT` (Short-Term)\n"
+                    f"  2️⃣ `{goal_2} USDT` (Mid-Term)\n"
+                    f"  3️⃣ `{goal_3} USDT` (Long-Term)\n"
+                    f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
                 )
 
                 send_telegram_alert(message)
@@ -88,3 +146,4 @@ def scan_tokens():
 if __name__ == "__main__":
     print("🚀 Trading bot is running...")
     app.run(host="0.0.0.0", port=8080, debug=True)
+
