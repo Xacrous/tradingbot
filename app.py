@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 # ✅ Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN = "7783208307:AAEWER2ylltWGd6g5I9XAH17yNmp7Imivbo"
-TELEGRAM_CHAT_ID = "1002324780762"
+TELEGRAM_CHAT_ID = "-1002324780762"
 
 # ✅ Binance API Initialization
 binance = ccxt.binance()
