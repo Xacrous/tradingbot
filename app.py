@@ -48,18 +48,23 @@ def send_daily_disclaimer():
 
 threading.Thread(target=send_daily_disclaimer, daemon=True).start()
 
-# ✅ Function to determine dynamic goals based on strategy
+# ✅ Function to determine dynamic goals based on strategy (Now Includes Percentage)
 def calculate_dynamic_goals(price, strategy):
     if strategy == "Momentum Breakout 🚀":
-        return round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4)
+        return (round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4),
+                12, 25, 50, -10)
     elif strategy == "Trend Continuation 📈":
-        return round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4)
+        return (round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4),
+                8, 18, 35, -8)
     elif strategy == "Reversal Pattern 🔄":
-        return round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4)
+        return (round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4),
+                6, 15, 30, -7)
     elif strategy == "Consolidation Breakout ⏸➡🚀":
-        return round(price * 1.08, 4), round(price * 1.20, 4), round(price * 1.40, 4), round(price * 0.94, 4)
+        return (round(price * 1.08, 4), round(price * 1.20, 4), round(price * 1.40, 4), round(price * 0.94, 4),
+                8, 20, 40, -6)
     elif strategy == "News & Social Trend 📰":
-        return round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4)
+        return (round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4),
+                5, 12, 25, -5)
     return None
 
 # ✅ Function to scan for trading opportunities
@@ -98,16 +103,16 @@ def find_gems():
 
             if strategy_used:
                 entry_price = row['last']
-                goal_1, goal_2, goal_3, stop_loss = calculate_dynamic_goals(entry_price, strategy_used)
+                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
                 message = (
                     f"*{strategy_used}*\n"
                     f"📌 *Token:* `{symbol}`\n"
                     f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"🎯 *Goal 1:* `{goal_1} USDT` (Short-term)\n"
-                    f"🎯 *Goal 2:* `{goal_2} USDT` (Mid-term)\n"
-                    f"🎯 *Goal 3:* `{goal_3} USDT` (Long-term)\n"
-                    f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
+                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
+                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
+                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
+                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
                 )
 
                 send_telegram_alert(message)
