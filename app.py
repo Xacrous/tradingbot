@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import numpy as np
 import time
+import threading
 
 app = Flask(__name__)
 
@@ -67,7 +68,7 @@ def find_gems():
                 signals.append(message)
 
         if not signals:
-            print("⚠️ No strong signals found. Try reducing thresholds.")
+            print("⚠️ No strong signals found. Waiting for next scan...")
 
         return signals
 
@@ -77,10 +78,23 @@ def find_gems():
         send_telegram_alert(error_msg)
         return [error_msg]
 
+# ✅ Function to Automatically Scan Every 5 Minutes
+def auto_scan():
+    while True:
+        print("🔄 Running automatic scan...")
+        find_gems()
+        time.sleep(300)  # Wait 5 minutes before the next scan
+
+# ✅ Start Auto-Scanning in a Background Thread
+threading.Thread(target=auto_scan, daemon=True).start()
+
 @app.route('/scan', methods=['GET'])
 def scan_tokens():
     signals = find_gems()
     return jsonify({"status": "success", "signals": signals})
 
 if __name__ == "__main__":
+    print("🚀 Trading bot is running...")
     app.run(host="0.0.0.0", port=8080, debug=True)
+``
+
