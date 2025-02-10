@@ -1,8 +1,6 @@
 from flask import Flask, jsonify
 import ccxt
-import pandas as pd
 import requests
-import numpy as np
 import time
 import threading
 from datetime import datetime, timedelta
@@ -57,16 +55,14 @@ def is_financially_halal(symbol, market_data):
         # 🚀 Exclude low liquidity tokens (high speculation risk)
         if market_data[symbol]['quoteVolume'] < 500000:
             return False
-
         # 🚀 Exclude interest-based staking/yield farming tokens
         if "stake" in symbol.lower() or "yield" in symbol.lower():
             return False
-
         return True  # Default to Halal if no red flags
     except KeyError:
         return None  # Unable to determine
 
-# ✅ Function to determine dynamic goals based on strategy (Now includes %)
+# ✅ Function to determine dynamic goals based on strategy
 def calculate_dynamic_goals(price, strategy):
     if strategy == "Momentum Breakout 🚀":
         return round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4), 12, 25, 50, -10
@@ -87,22 +83,16 @@ def find_gems():
         current_time = time.time()
 
         for symbol, row in usdt_pairs.items():
-            if 'quoteVolume' not in row or 'open' not in row or 'last' not in row:
-                continue
-
-            if row['last'] is None or row['open'] is None:
-                print(f"⚠️ Skipping {symbol}: Missing 'last' or 'open' price data.")
-                continue
+            if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
+                continue  # ✅ Skip tokens with missing price data
 
             # ✅ Financial Screening for Halal Compliance
             if not is_financially_halal(symbol, market_data):
-                print(f"❌ Skipping {symbol}: Fails financial screening")
-                continue
+                continue  # ✅ Skip non-halal tokens
 
             # ✅ Prevent duplicate signals within 24 hours
             if symbol in sent_signals and current_time - sent_signals[symbol] < 86400:
-                print(f"🔄 Skipping {symbol}: Signal already sent within 24 hours")
-                continue
+                continue  # ✅ Skip duplicates
 
             # ✅ Calculate percentage change
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
@@ -147,7 +137,6 @@ def find_gems():
 # ✅ Auto-Scanning Every 5 Minutes
 def auto_scan():
     while True:
-        print("🔄 Running automatic scan...")
         find_gems()
         time.sleep(300)
 
