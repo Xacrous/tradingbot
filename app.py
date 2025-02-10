@@ -108,7 +108,7 @@ def find_gems():
             )
 
             message = (
-                f"*{strategy_used} Detected!* 🔥
+                f"*{strategy_used} Detected!* 🔥"
 "
                 f"📌 *Token:* `{symbol}`
 "
