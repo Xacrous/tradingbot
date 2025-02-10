@@ -4,7 +4,7 @@ import requests
 import time
 import threading
 from datetime import datetime, timedelta
-import pytz  # Handling Kuwait timezone
+import pytz  
 
 app = Flask(__name__)
 
@@ -20,7 +20,7 @@ sent_signals = {}
 
 # ✅ Kuwait Timezone
 KUWAIT_TZ = pytz.timezone("Asia/Kuwait")
-last_disclaimer_sent = None  # Track last disclaimer message time
+last_disclaimer_sent = None  
 
 # ✅ Function to send alerts to Telegram
 def send_telegram_alert(message):
@@ -28,7 +28,7 @@ def send_telegram_alert(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
-# ✅ Function to send daily disclaimer at 12 PM Kuwait time
+# ✅ Daily Disclaimer at 12 PM Kuwait Time
 def send_daily_disclaimer():
     global last_disclaimer_sent
     while True:
@@ -44,33 +44,23 @@ def send_daily_disclaimer():
             )
             send_telegram_alert(disclaimer_message)
             last_disclaimer_sent = now
-        time.sleep(3600)  # Check every hour to ensure it's sent at 12 PM
+        time.sleep(3600)  
 
-# ✅ Start the disclaimer function in a separate thread
 threading.Thread(target=send_daily_disclaimer, daemon=True).start()
-
-# ✅ Function to check financial halal compliance
-def is_financially_halal(symbol, market_data):
-    try:
-        # 🚀 Exclude low liquidity tokens (high speculation risk)
-        if market_data[symbol]['quoteVolume'] < 500000:
-            return False
-        # 🚀 Exclude interest-based staking/yield farming tokens
-        if "stake" in symbol.lower() or "yield" in symbol.lower():
-            return False
-        return True  # Default to Halal if no red flags
-    except KeyError:
-        return None  # Unable to determine
 
 # ✅ Function to determine dynamic goals based on strategy
 def calculate_dynamic_goals(price, strategy):
     if strategy == "Momentum Breakout 🚀":
-        return round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4), 12, 25, 50, -10
+        return round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4)
     elif strategy == "Trend Continuation 📈":
-        return round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4), 8, 18, 35, -8
+        return round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4)
     elif strategy == "Reversal Pattern 🔄":
-        return round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4), 6, 15, 30, -7
-    return round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4), 5, 12, 25, -5
+        return round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4)
+    elif strategy == "Consolidation Breakout ⏸➡🚀":
+        return round(price * 1.08, 4), round(price * 1.20, 4), round(price * 1.40, 4), round(price * 0.94, 4)
+    elif strategy == "News & Social Trend 📰":
+        return round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4)
+    return None
 
 # ✅ Function to scan for trading opportunities
 def find_gems():
@@ -81,51 +71,47 @@ def find_gems():
 
         signals = []
         current_time = time.time()
+        today = datetime.now().date()
 
         for symbol, row in usdt_pairs.items():
             if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
-                continue  # ✅ Skip tokens with missing price data
+                continue  
 
-            # ✅ Financial Screening for Halal Compliance
-            if not is_financially_halal(symbol, market_data):
-                continue  # ✅ Skip non-halal tokens
+            # ✅ Prevent duplicate signals for the same token on the same day
+            if symbol in sent_signals and sent_signals[symbol] == today:
+                continue  
 
-            # ✅ Prevent duplicate signals within 24 hours
-            if symbol in sent_signals and current_time - sent_signals[symbol] < 86400:
-                continue  # ✅ Skip duplicates
-
-            # ✅ Calculate percentage change
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
-            # ✅ Assign strategy based on movement
+            # ✅ Strategy Selection
+            strategy_used = None
             if percent_change > 20:
                 strategy_used = "Momentum Breakout 🚀"
             elif 10 < percent_change <= 20:
                 strategy_used = "Trend Continuation 📈"
             elif percent_change < -5:
                 strategy_used = "Reversal Pattern 🔄"
-            else:
-                strategy_used = "Standard Trend ✅"
+            elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000:
+                strategy_used = "Consolidation Breakout ⏸➡🚀"
+            elif row['quoteVolume'] > 5000000:  
+                strategy_used = "News & Social Trend 📰"
 
-            # ✅ Signal condition
-            if percent_change > 3 and row['quoteVolume'] > 1000000:
+            if strategy_used:
                 entry_price = row['last']
-                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
-
-                print(f"🚀 {strategy_used}: {symbol} detected!")
+                goal_1, goal_2, goal_3, stop_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
                 message = (
                     f"*{strategy_used}*\n"
                     f"📌 *Token:* `{symbol}`\n"
                     f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
-                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
-                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
-                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
+                    f"🎯 *Goal 1:* `{goal_1} USDT` (Short-term)\n"
+                    f"🎯 *Goal 2:* `{goal_2} USDT` (Mid-term)\n"
+                    f"🎯 *Goal 3:* `{goal_3} USDT` (Long-term)\n"
+                    f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
                 )
 
                 send_telegram_alert(message)
-                sent_signals[symbol] = current_time
+                sent_signals[symbol] = today  
                 signals.append(message)
 
         return signals
