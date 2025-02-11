@@ -1,7 +1,8 @@
 ccxt
 pandas
+pandas_ta
 python-telegram-bot
 requests
 flask
 schedule
-pandas_ta
+numpy==1.23.5  # ✅ Fix pandas_ta ImportError
