@@ -16,10 +16,3 @@ EXPOSE 8080
 
 # Start the bot server
 CMD ["python", "app.py"]
-
-Requirements.txt
-ccxt
-pandas
-python-telegram-bot
-requests
-flask
