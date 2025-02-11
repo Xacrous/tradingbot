@@ -1,16 +1,21 @@
-from flask import Flask, jsonify
+import os
 import ccxt
 import requests
 import time
 import threading
+import schedule
+import pandas as pd
+from flask import Flask, jsonify
 from datetime import datetime, timedelta
-import pytz  
+import pytz
+import talib
 
+# ✅ Load credentials from environment variables
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+# ✅ Initialize Flask app
 app = Flask(__name__)
-
-# ✅ Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN = "7783208307:AAEWER2ylltWGd6g5I9XAH17yNmp7Imivbo"
-TELEGRAM_CHAT_ID = "-1002324780762"
 
 # ✅ Binance API Initialization
 binance = ccxt.binance()
@@ -28,136 +33,136 @@ def send_telegram_alert(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
-# ✅ Daily Disclaimer at 12 PM Kuwait Time
+# ✅ Function to send daily disclaimer message
 def send_daily_disclaimer():
     global last_disclaimer_sent
-    while True:
-        now = datetime.now(KUWAIT_TZ)
-        if now.hour == 12 and (last_disclaimer_sent is None or last_disclaimer_sent.date() < now.date()):
-            disclaimer_message = (
-                "⚠️ *Disclaimer:*\n"
-                "This bot uses algorithms to determine signals and Islamic permissibility. "
-                "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
-                "⚠️ *إخلاء المسؤولية:*\n"
-                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
-                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
-            )
-            send_telegram_alert(disclaimer_message)
-            last_disclaimer_sent = now
-        time.sleep(3600)  # Wait an hour before checking again
+    now = datetime.now(KUWAIT_TZ)
+    if now.hour == 12 and (last_disclaimer_sent is None or last_disclaimer_sent.date() < now.date()):
+        disclaimer_message = (
+            "⚠️ *Disclaimer:*\n"
+            "This bot uses algorithms to determine signals and Islamic permissibility. "
+            "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
+            "⚠️ *إخلاء المسؤولية:*\n"
+            "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
+            "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
+        )
+        send_telegram_alert(disclaimer_message)
+        last_disclaimer_sent = now
 
-threading.Thread(target=send_daily_disclaimer, daemon=True).start()
+# ✅ Function to fetch Binance market data
+def fetch_binance_data():
+    return binance.fetch_tickers()
 
 # ✅ Function to get trending tokens from CoinGecko
 def get_trending_coins():
     try:
         url = "https://api.coingecko.com/api/v3/search/trending"
         response = requests.get(url).json()
-        trending_coins = [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
-        return trending_coins
+        return [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
     except Exception as e:
         print(f"⚠️ Error fetching trending tokens: {str(e)}")
         return []
 
-# ✅ Function to determine dynamic goals based on strategy (Now Uses 1D for Goals 1 & 2, 1W for Goal 3)
-def calculate_dynamic_goals(price, strategy):
-    if strategy == "Momentum Breakout 🚀":
-        return (round(price * 1.08, 4), round(price * 1.15, 4), round(price * 1.40, 4), round(price * 0.90, 4),
-                8, 15, 40, -10)  # Short & Mid from 1D, Long from 1W
-    elif strategy == "Trend Continuation 📈":
-        return (round(price * 1.06, 4), round(price * 1.12, 4), round(price * 1.30, 4), round(price * 0.92, 4),
-                6, 12, 30, -8)
-    elif strategy == "Reversal Pattern 🔄":
-        return (round(price * 1.05, 4), round(price * 1.10, 4), round(price * 1.25, 4), round(price * 0.93, 4),
-                5, 10, 25, -7)
-    elif strategy == "Consolidation Breakout ⏸➡🚀":
-        return (round(price * 1.06, 4), round(price * 1.14, 4), round(price * 1.35, 4), round(price * 0.94, 4),
-                6, 14, 35, -6)
-    elif strategy == "News & Social Trend 📰":
-        return (round(price * 1.04, 4), round(price * 1.08, 4), round(price * 1.20, 4), round(price * 0.95, 4),
-                4, 8, 20, -5)
-    return None
+# ✅ Function to compute technical indicators
+def compute_indicators(symbol):
+    ohlcv = binance.fetch_ohlcv(symbol, timeframe="1h", limit=50)
+    df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+
+    df["ema_50"] = talib.EMA(df["close"], timeperiod=50)
+    df["ema_200"] = talib.EMA(df["close"], timeperiod=200)
+    df["rsi"] = talib.RSI(df["close"], timeperiod=14)
+    df["macd"], df["macd_signal"], _ = talib.MACD(df["close"], fastperiod=12, slowperiod=26, signalperiod=9)
+    df["upper_bb"], df["middle_bb"], df["lower_bb"] = talib.BBANDS(df["close"], timeperiod=20)
+    df["adx"] = talib.ADX(df["high"], df["low"], df["close"], timeperiod=14)
+    df["stoch_rsi"] = talib.STOCHRSI(df["close"], timeperiod=14)
+    
+    return df.iloc[-1]
+
+# ✅ Function to calculate price targets
+def calculate_goals(entry, strategy):
+    multipliers = {
+        "Momentum Breakout 🚀": (1.08, 1.15, 1.40, 0.90),
+        "Trend Continuation 📈": (1.06, 1.12, 1.30, 0.92),
+        "Reversal Pattern 🔄": (1.05, 1.10, 1.25, 0.93),
+        "Consolidation Breakout ⏸➡🚀": (1.06, 1.14, 1.35, 0.94),
+        "News & Social Trend 📰": (1.04, 1.08, 1.20, 0.95),
+    }
+    return tuple(round(entry * x, 4) for x in multipliers[strategy])
 
 # ✅ Function to scan for trading opportunities
 def find_gems():
-    try:
-        print("🔄 Fetching Binance Market Data...")
-        market_data = binance.fetch_tickers()
-        usdt_pairs = {symbol: data for symbol, data in market_data.items() if "/USDT" in symbol}
+    market_data = fetch_binance_data()
+    trending_coins = get_trending_coins()
+    today = datetime.now().date()
+    
+    for symbol, row in market_data.items():
+        if symbol in sent_signals and sent_signals[symbol] == today:
+            continue  
 
-        trending_coins = get_trending_coins()
+        percent_change = ((row['last'] - row['open']) / row['open']) * 100
+        indicators = compute_indicators(symbol)
 
-        signals = []
-        today = datetime.now().date()
+        strategy_used = None
+        if (
+            percent_change > 20 and 
+            55 <= indicators["rsi"] <= 75 and 
+            indicators["macd"] > indicators["macd_signal"] and 
+            row["last"] > indicators["upper_bb"]
+        ):
+            strategy_used = "Momentum Breakout 🚀"
 
-        for symbol, row in usdt_pairs.items():
-            if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
-                continue  
+        elif (
+            10 < percent_change <= 20 and 
+            row["last"] > indicators["ema_50"] and 
+            indicators["adx"] > 25
+        ):
+            strategy_used = "Trend Continuation 📈"
 
-            # ✅ Prevent duplicate signals for the same token on the same day
-            if symbol in sent_signals and sent_signals[symbol] == today:
-                continue  
+        elif (
+            percent_change < -5 and 
+            indicators["rsi"] < 30 and 
+            indicators["macd"] < indicators["macd_signal"]
+        ):
+            strategy_used = "Reversal Pattern 🔄"
 
-            percent_change = ((row['last'] - row['open']) / row['open']) * 100
+        elif (
+            abs(percent_change) < 3 and 
+            row["quoteVolume"] > 2000000 and 
+            indicators["middle_bb"] - indicators["lower_bb"] < 0.05 * row["last"]
+        ):
+            strategy_used = "Consolidation Breakout ⏸➡🚀"
 
-            # ✅ Determine Volatility Level
-            if abs(percent_change) > 10:
-                volatility = "🔴 *High Volatility*"
-            elif abs(percent_change) < 5:
-                volatility = "🟢 *Low Volatility*"
-            else:
-                volatility = "🟡 *Moderate Volatility*"
+        elif (
+            symbol in trending_coins and 
+            row["quoteVolume"] > 5000000 and 
+            row["last"] > indicators["middle_bb"]
+        ):
+            strategy_used = "News & Social Trend 📰"
 
-            # ✅ Strategy Selection
-            strategy_used = None
-            if percent_change > 20:
-                strategy_used = "Momentum Breakout 🚀"
-            elif 10 < percent_change <= 20:
-                strategy_used = "Trend Continuation 📈"
-            elif percent_change < -5:
-                strategy_used = "Reversal Pattern 🔄"
-            elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000:
-                strategy_used = "Consolidation Breakout ⏸➡🚀"
-            elif symbol in trending_coins and row['quoteVolume'] > 5000000:
-                strategy_used = "News & Social Trend 📰"
+        if strategy_used:
+            entry_price = row["last"]
+            goal_1, goal_2, goal_3, stop_loss = calculate_goals(entry_price, strategy_used)
 
-            if strategy_used:
-                entry_price = row['last']
-                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
+            message = (
+                f"*{strategy_used}*\n"
+                f"📌 *Token:* `{symbol}`\n"
+                f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
+                f"🎯 *Goal 1:* `{goal_1} USDT` (Short-term) 📅 1-Day\n"
+                f"🎯 *Goal 2:* `{goal_2} USDT` (Mid-term) 📅 1-Day\n"
+                f"🎯 *Goal 3:* `{goal_3} USDT` (Long-term) 📅 1-Week\n"
+                f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
+            )
 
-                message = (
-                    f"*{strategy_used}*\n"
-                    f"📌 *Token:* `{symbol}`\n"
-                    f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
-                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
-                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
-                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
-                    f"📊 *Volatility:* {volatility}\n"  # Added Volatility Information
-                )
+            send_telegram_alert(message)
+            sent_signals[symbol] = today
 
-                send_telegram_alert(message)
-                sent_signals[symbol] = today  
-                signals.append(message)
-
-        return signals
-
-    except Exception as e:
-        print(f"⚠️ Error during scanning: {str(e)}")
-        return []
-
-# ✅ Auto-Scanning Every 5 Minutes
+# ✅ Auto-Scanning Every 5 Minutes using Schedule
 def auto_scan():
+    find_gems()
+    schedule.every(5).minutes.do(find_gems)
+    schedule.every().day.at("12:00").do(send_daily_disclaimer)
     while True:
-        find_gems()
-        time.sleep(300)
+        schedule.run_pending()
+        time.sleep(1)
 
 threading.Thread(target=auto_scan, daemon=True).start()
-
-@app.route('/scan', methods=['GET'])
-def scan_tokens():
-    return jsonify({"status": "success", "signals": find_gems()})
-
-if __name__ == "__main__":
-    print("🚀 Trading bot is running...")
-    app.run(host="0.0.0.0", port=8080, debug=True)
