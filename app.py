@@ -94,6 +94,9 @@ def find_gems():
         today = datetime.now().date()
 
         for symbol, row in usdt_pairs.items():
+            if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
+                continue  
+
             if symbol in sent_signals and sent_signals[symbol] == today:
                 continue  
 
