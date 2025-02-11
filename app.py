@@ -5,7 +5,7 @@ import time
 import threading
 import schedule
 import pandas as pd
-import pandas_ta as ta  # ✅ Using pandas_ta instead of TA-Lib
+import pandas_ta as ta  # ✅ Using pandas_ta correctly
 from flask import Flask, jsonify
 from datetime import datetime
 import pytz
@@ -53,23 +53,27 @@ def send_daily_disclaimer():
 def fetch_binance_data():
     return binance.fetch_tickers()
 
-# ✅ Function to compute technical indicators using `pandas_ta`
+# ✅ Function to compute technical indicators (FIXED)
 def compute_indicators(symbol):
     ohlcv = binance.fetch_ohlcv(symbol, timeframe="1h", limit=50)
     df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
 
-    df["ema_50"] = df["close"].ta.ema(length=50)
-    df["ema_200"] = df["close"].ta.ema(length=200)
-    df["rsi"] = df["close"].ta.rsi(length=14)
-    macd = df["close"].ta.macd(fast=12, slow=26, signal=9)
+    # ✅ Fix: Explicitly initialize pandas_ta
+    df.ta.strategy("all")
+
+    # ✅ Use correct `pandas_ta` syntax
+    df["ema_50"] = ta.ema(df["close"], length=50)
+    df["ema_200"] = ta.ema(df["close"], length=200)
+    df["rsi"] = ta.rsi(df["close"], length=14)
+    macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
     df["macd"] = macd["MACD_12_26_9"]
     df["macd_signal"] = macd["MACDs_12_26_9"]
-    bbands = df["close"].ta.bbands(length=20)
+    bbands = ta.bbands(df["close"], length=20)
     df["upper_bb"] = bbands["BBU_20_2.0"]
     df["middle_bb"] = bbands["BBM_20_2.0"]
     df["lower_bb"] = bbands["BBL_20_2.0"]
-    df["adx"] = df.ta.adx(length=14)["ADX_14"]
-    
+    df["adx"] = ta.adx(df["high"], df["low"], df["close"], length=14)["ADX_14"]
+
     return df.iloc[-1]
 
 # ✅ Function to calculate price targets
