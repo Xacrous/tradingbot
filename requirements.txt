@@ -3,3 +3,5 @@ pandas
 python-telegram-bot
 requests
 flask
+schedule
+TA-Lib
