@@ -100,6 +100,14 @@ def find_gems():
 
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
+            # ✅ Determine Volatility Level
+            if abs(percent_change) > 10:
+                volatility = "🔴 *High Volatility*"
+            elif abs(percent_change) < 5:
+                volatility = "🟢 *Low Volatility*"
+            else:
+                volatility = "🟡 *Moderate Volatility*"
+
             # ✅ Strategy Selection
             strategy_used = None
             if percent_change > 20:
@@ -125,6 +133,7 @@ def find_gems():
                     f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
                     f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
                     f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
+                    f"📊 *Volatility:* {volatility}\n"  # Added Volatility Information
                 )
 
                 send_telegram_alert(message)
