@@ -5,10 +5,10 @@ import time
 import threading
 import schedule
 import pandas as pd
+import pandas_ta as ta  # ✅ Using pandas_ta instead of TA-Lib
 from flask import Flask, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
-import talib
 
 # ✅ Load credentials from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -53,28 +53,22 @@ def send_daily_disclaimer():
 def fetch_binance_data():
     return binance.fetch_tickers()
 
-# ✅ Function to get trending tokens from CoinGecko
-def get_trending_coins():
-    try:
-        url = "https://api.coingecko.com/api/v3/search/trending"
-        response = requests.get(url).json()
-        return [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
-    except Exception as e:
-        print(f"⚠️ Error fetching trending tokens: {str(e)}")
-        return []
-
-# ✅ Function to compute technical indicators
+# ✅ Function to compute technical indicators using `pandas_ta`
 def compute_indicators(symbol):
     ohlcv = binance.fetch_ohlcv(symbol, timeframe="1h", limit=50)
     df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
 
-    df["ema_50"] = talib.EMA(df["close"], timeperiod=50)
-    df["ema_200"] = talib.EMA(df["close"], timeperiod=200)
-    df["rsi"] = talib.RSI(df["close"], timeperiod=14)
-    df["macd"], df["macd_signal"], _ = talib.MACD(df["close"], fastperiod=12, slowperiod=26, signalperiod=9)
-    df["upper_bb"], df["middle_bb"], df["lower_bb"] = talib.BBANDS(df["close"], timeperiod=20)
-    df["adx"] = talib.ADX(df["high"], df["low"], df["close"], timeperiod=14)
-    df["stoch_rsi"] = talib.STOCHRSI(df["close"], timeperiod=14)
+    df["ema_50"] = df["close"].ta.ema(length=50)
+    df["ema_200"] = df["close"].ta.ema(length=200)
+    df["rsi"] = df["close"].ta.rsi(length=14)
+    macd = df["close"].ta.macd(fast=12, slow=26, signal=9)
+    df["macd"] = macd["MACD_12_26_9"]
+    df["macd_signal"] = macd["MACDs_12_26_9"]
+    bbands = df["close"].ta.bbands(length=20)
+    df["upper_bb"] = bbands["BBU_20_2.0"]
+    df["middle_bb"] = bbands["BBM_20_2.0"]
+    df["lower_bb"] = bbands["BBL_20_2.0"]
+    df["adx"] = df.ta.adx(length=14)["ADX_14"]
     
     return df.iloc[-1]
 
@@ -89,10 +83,27 @@ def calculate_goals(entry, strategy):
     }
     return tuple(round(entry * x, 4) for x in multipliers[strategy])
 
+# ✅ Function to determine market status (Bearish, Sideway, Bullish)
+def determine_market_status(indicators):
+    if indicators["ema_50"] < indicators["ema_200"]:
+        return "📉 *Bearish Market*"
+    elif abs(indicators["ema_50"] - indicators["ema_200"]) < 0.5:
+        return "➡️ *Sideway Market*"
+    else:
+        return "📈 *Bullish Market*"
+
+# ✅ Function to determine volatility status (Low, Mid, High)
+def determine_volatility(indicators):
+    if indicators["adx"] < 20:
+        return "🟢 *Low Volatility*"
+    elif 20 <= indicators["adx"] < 40:
+        return "🟡 *Mid Volatility*"
+    else:
+        return "🔴 *High Volatility*"
+
 # ✅ Function to scan for trading opportunities
 def find_gems():
     market_data = fetch_binance_data()
-    trending_coins = get_trending_coins()
     today = datetime.now().date()
     
     for symbol, row in market_data.items():
@@ -132,16 +143,11 @@ def find_gems():
         ):
             strategy_used = "Consolidation Breakout ⏸➡🚀"
 
-        elif (
-            symbol in trending_coins and 
-            row["quoteVolume"] > 5000000 and 
-            row["last"] > indicators["middle_bb"]
-        ):
-            strategy_used = "News & Social Trend 📰"
-
         if strategy_used:
             entry_price = row["last"]
             goal_1, goal_2, goal_3, stop_loss = calculate_goals(entry_price, strategy_used)
+            market_status = determine_market_status(indicators)
+            volatility_status = determine_volatility(indicators)
 
             message = (
                 f"*{strategy_used}*\n"
@@ -151,6 +157,8 @@ def find_gems():
                 f"🎯 *Goal 2:* `{goal_2} USDT` (Mid-term) 📅 1-Day\n"
                 f"🎯 *Goal 3:* `{goal_3} USDT` (Long-term) 📅 1-Week\n"
                 f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
+                f"{volatility_status}\n"
+                f"{market_status}\n"
             )
 
             send_telegram_alert(message)
@@ -166,3 +174,8 @@ def auto_scan():
         time.sleep(1)
 
 threading.Thread(target=auto_scan, daemon=True).start()
+
+# ✅ Start Flask App with Correct Port
+if __name__ == "__main__":
+    print("🚀 Trading bot is running...")
+    app.run(host="0.0.0.0", port=8080, debug=False)
