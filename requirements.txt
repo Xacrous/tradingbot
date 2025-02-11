@@ -4,4 +4,4 @@ python-telegram-bot
 requests
 flask
 schedule
-TA-Lib
+pandas_ta
