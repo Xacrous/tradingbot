@@ -34,14 +34,14 @@ def send_daily_disclaimer():
     while True:
         now = datetime.now(KUWAIT_TZ)
         if now.hour == 12 and (last_disclaimer_sent is None or last_disclaimer_sent.date() < now.date()):
-            disclaimer_message = (
-                "⚠️ *Disclaimer:*\n"
-                "This bot uses algorithms to determine signals and Islamic permissibility. "
-                "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
-‎                "⚠️ *إخلاء المسؤولية:*\n"
-‎                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
-‎                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
-            )
+disclaimer_message = (
+    "⚠️ *Disclaimer:*\n"
+    "This bot uses algorithms to determine signals and Islamic permissibility. "
+    "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
+    "⚠️ *إخلاء المسؤولية:*\n"
+    "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية.\n"
+    "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
+)
             send_telegram_alert(disclaimer_message)
             last_disclaimer_sent = now
         time.sleep(3600)  
