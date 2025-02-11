@@ -38,13 +38,13 @@ def send_daily_disclaimer():
                 "⚠️ *Disclaimer:*\n"
                 "This bot uses algorithms to determine signals and Islamic permissibility. "
                 "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
-‎                "⚠️ *إخلاء المسؤولية:*\n"
-‎                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
-‎                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
+                "⚠️ *إخلاء المسؤولية:*\n"
+                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
+                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
             )
             send_telegram_alert(disclaimer_message)
             last_disclaimer_sent = now
-        time.sleep(3600)  
+        time.sleep(3600)  # Wait an hour before checking again
 
 threading.Thread(target=send_daily_disclaimer, daemon=True).start()
 
