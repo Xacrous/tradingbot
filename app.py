@@ -159,7 +159,6 @@ def find_gems():
                 f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
                 f"🎯 *Goal 1:* `{goal_1} USDT` (Short-term) 📅 1-Day\n"
                 f"🎯 *Goal 2:* `{goal_2} USDT` (Mid-term) 📅 1-Day\n"
-                f"🎯 *Goal 3:* `{goal_3} USDT` (Long-term) 📅 1-Week\n"
                 f"⛔ *Stop Loss:* `{stop_loss} USDT`\n"
                 f"{volatility_status}\n"
                 f"{market_status}\n"
