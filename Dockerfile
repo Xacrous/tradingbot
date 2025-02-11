@@ -1,18 +1,20 @@
-Dockerfile
-# Use official Python image
+# Use the official Python image
 FROM python:3.9
 
-# Set working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy all files into the container
-COPY . /app
+# Copy the requirements file
+COPY requirements.txt .
 
 # Install dependencies
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 8080 (Digital Ocean requires this)
+# Copy the application files
+COPY . .
+
+# Expose port 8080 for Flask
 EXPOSE 8080
 
-# Start the bot server
+# Command to run the application
 CMD ["python", "app.py"]
