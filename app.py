@@ -48,6 +48,17 @@ def send_daily_disclaimer():
 
 threading.Thread(target=send_daily_disclaimer, daemon=True).start()
 
+# ✅ Function to get trending tokens from CoinGecko
+def get_trending_coins():
+    try:
+        url = "https://api.coingecko.com/api/v3/search/trending"
+        response = requests.get(url).json()
+        trending_coins = [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
+        return trending_coins
+    except Exception as e:
+        print(f"⚠️ Error fetching trending tokens: {str(e)}")
+        return []
+
 # ✅ Function to determine dynamic goals based on strategy (Now Includes Percentage)
 def calculate_dynamic_goals(price, strategy):
     if strategy == "Momentum Breakout 🚀":
@@ -74,8 +85,9 @@ def find_gems():
         market_data = binance.fetch_tickers()
         usdt_pairs = {symbol: data for symbol, data in market_data.items() if "/USDT" in symbol}
 
+        trending_coins = get_trending_coins()
+
         signals = []
-        current_time = time.time()
         today = datetime.now().date()
 
         for symbol, row in usdt_pairs.items():
@@ -98,7 +110,7 @@ def find_gems():
                 strategy_used = "Reversal Pattern 🔄"
             elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000:
                 strategy_used = "Consolidation Breakout ⏸➡🚀"
-            elif row['quoteVolume'] > 5000000:  
+            elif symbol in trending_coins and row['quoteVolume'] > 5000000:
                 strategy_used = "News & Social Trend 📰"
 
             if strategy_used:
