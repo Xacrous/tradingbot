@@ -59,23 +59,23 @@ def get_trending_coins():
         print(f"⚠️ Error fetching trending tokens: {str(e)}")
         return []
 
-# ✅ Function to determine dynamic goals based on strategy (Now Includes Percentage)
+# ✅ Function to determine dynamic goals based on strategy (Now Uses 1D for Goals 1 & 2, 1W for Goal 3)
 def calculate_dynamic_goals(price, strategy):
     if strategy == "Momentum Breakout 🚀":
-        return (round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4),
-                12, 25, 50, -10)
+        return (round(price * 1.08, 4), round(price * 1.15, 4), round(price * 1.40, 4), round(price * 0.90, 4),
+                8, 15, 40, -10)  # Short & Mid from 1D, Long from 1W
     elif strategy == "Trend Continuation 📈":
-        return (round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4),
-                8, 18, 35, -8)
+        return (round(price * 1.06, 4), round(price * 1.12, 4), round(price * 1.30, 4), round(price * 0.92, 4),
+                6, 12, 30, -8)
     elif strategy == "Reversal Pattern 🔄":
-        return (round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4),
-                6, 15, 30, -7)
+        return (round(price * 1.05, 4), round(price * 1.10, 4), round(price * 1.25, 4), round(price * 0.93, 4),
+                5, 10, 25, -7)
     elif strategy == "Consolidation Breakout ⏸➡🚀":
-        return (round(price * 1.08, 4), round(price * 1.20, 4), round(price * 1.40, 4), round(price * 0.94, 4),
-                8, 20, 40, -6)
+        return (round(price * 1.06, 4), round(price * 1.14, 4), round(price * 1.35, 4), round(price * 0.94, 4),
+                6, 14, 35, -6)
     elif strategy == "News & Social Trend 📰":
-        return (round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4),
-                5, 12, 25, -5)
+        return (round(price * 1.04, 4), round(price * 1.08, 4), round(price * 1.20, 4), round(price * 0.95, 4),
+                4, 8, 20, -5)
     return None
 
 # ✅ Function to scan for trading opportunities
