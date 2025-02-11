@@ -38,9 +38,9 @@ def send_daily_disclaimer():
                 "⚠️ *Disclaimer:*\n"
                 "This bot uses algorithms to determine signals and Islamic permissibility. "
                 "Please DYOR (Do Your Own Research) on every signal, we are not responsible for any losses.\n\n"
-                "⚠️ *إخلاء المسؤولية:*\n"
-                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
-                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
+‎                "⚠️ *إخلاء المسؤولية:*\n"
+‎                "يستخدم هذا البوت خوارزميات لتحديد الإشارات والتوافق مع الشريعة الإسلامية. "
+‎                "يرجى إجراء بحثك الخاص على كل إشارة، نحن غير مسؤولين عن أي خسائر."
             )
             send_telegram_alert(disclaimer_message)
             last_disclaimer_sent = now
@@ -53,36 +53,30 @@ def get_trending_coins():
     try:
         url = "https://api.coingecko.com/api/v3/search/trending"
         response = requests.get(url).json()
-        return [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
+        trending_coins = [coin["item"]["symbol"].upper() + "/USDT" for coin in response["coins"]]
+        return trending_coins
     except Exception as e:
         print(f"⚠️ Error fetching trending tokens: {str(e)}")
         return []
 
-# ✅ Function to fetch 1-week historical price data for long-term goals
-def get_weekly_high(symbol):
-    try:
-        ohlcv = binance.fetch_ohlcv(symbol, timeframe='1w', limit=2)
-        if ohlcv and len(ohlcv) > 1:
-            return max(ohlcv[-1][2], ohlcv[-2][2])  
-        return None
-    except Exception as e:
-        print(f"⚠️ Error fetching weekly data for {symbol}: {str(e)}")
-        return None
-
-# ✅ Function to determine dynamic goals based on strategy
-def calculate_dynamic_goals(price, symbol, strategy):
-    weekly_high = get_weekly_high(symbol) or round(price * 1.75, 4)
-
-    goals = {
-        "Momentum Breakout 🚀": (1.12, 1.25, weekly_high, 0.90),
-        "Trend Continuation 📈": (1.08, 1.18, weekly_high, 0.92),
-        "Reversal Pattern 🔄": (1.06, 1.15, weekly_high, 0.93),
-        "Consolidation Breakout ⏸➡🚀": (1.08, 1.20, weekly_high, 0.94),
-        "News & Social Trend 📰": (1.05, 1.12, weekly_high, 0.95)
-    }
-
-    g1, g2, g3, sl = goals[strategy]
-    return round(price * g1, 4), round(price * g2, 4), g3, round(price * sl, 4), (g1 - 1) * 100, (g2 - 1) * 100, (g3 / price - 1) * 100, (sl - 1) * 100
+# ✅ Function to determine dynamic goals based on strategy (Now Includes Percentage)
+def calculate_dynamic_goals(price, strategy):
+    if strategy == "Momentum Breakout 🚀":
+        return (round(price * 1.12, 4), round(price * 1.25, 4), round(price * 1.50, 4), round(price * 0.90, 4),
+                12, 25, 50, -10)
+    elif strategy == "Trend Continuation 📈":
+        return (round(price * 1.08, 4), round(price * 1.18, 4), round(price * 1.35, 4), round(price * 0.92, 4),
+                8, 18, 35, -8)
+    elif strategy == "Reversal Pattern 🔄":
+        return (round(price * 1.06, 4), round(price * 1.15, 4), round(price * 1.30, 4), round(price * 0.93, 4),
+                6, 15, 30, -7)
+    elif strategy == "Consolidation Breakout ⏸➡🚀":
+        return (round(price * 1.08, 4), round(price * 1.20, 4), round(price * 1.40, 4), round(price * 0.94, 4),
+                8, 20, 40, -6)
+    elif strategy == "News & Social Trend 📰":
+        return (round(price * 1.05, 4), round(price * 1.12, 4), round(price * 1.25, 4), round(price * 0.95, 4),
+                5, 12, 25, -5)
+    return None
 
 # ✅ Function to scan for trading opportunities
 def find_gems():
@@ -90,18 +84,23 @@ def find_gems():
         print("🔄 Fetching Binance Market Data...")
         market_data = binance.fetch_tickers()
         usdt_pairs = {symbol: data for symbol, data in market_data.items() if "/USDT" in symbol}
+
         trending_coins = get_trending_coins()
+
+        signals = []
         today = datetime.now().date()
 
         for symbol, row in usdt_pairs.items():
             if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
                 continue  
 
+            # ✅ Prevent duplicate signals for the same token on the same day
             if symbol in sent_signals and sent_signals[symbol] == today:
                 continue  
 
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
+            # ✅ Strategy Selection
             strategy_used = None
             if percent_change > 20:
                 strategy_used = "Momentum Breakout 🚀"
@@ -116,23 +115,40 @@ def find_gems():
 
             if strategy_used:
                 entry_price = row['last']
-                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, symbol, strategy_used)
+                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
                 message = (
                     f"*{strategy_used}*\n"
                     f"📌 *Token:* `{symbol}`\n"
                     f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1:.2f}%) (Short-term)\n"
-                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2:.2f}%) (Mid-term)\n"
-                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3:.2f}%) (Long-term, based on 1-week chart)\n"
-                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss:.2f}%)\n"
+                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
+                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
+                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
+                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
                 )
 
                 send_telegram_alert(message)
                 sent_signals[symbol] = today  
+                signals.append(message)
+
+        return signals
 
     except Exception as e:
-        print(f"⚠️ Error: {str(e)}")
+        print(f"⚠️ Error during scanning: {str(e)}")
+        return []
 
 # ✅ Auto-Scanning Every 5 Minutes
-threading.Thread(target=find_gems, daemon=True).start()
+def auto_scan():
+    while True:
+        find_gems()
+        time.sleep(300)
+
+threading.Thread(target=auto_scan, daemon=True).start()
+
+@app.route('/scan', methods=['GET'])
+def scan_tokens():
+    return jsonify({"status": "success", "signals": find_gems()})
+
+if __name__ == "__main__":
+    print("🚀 Trading bot is running...")
+    app.run(host="0.0.0.0", port=8080, debug=True)
