@@ -131,7 +131,6 @@ def find_gems():
                     f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
                     f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
                     f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
-                    f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
                     f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
                     f"📊 *Volatility:* {volatility}\n"  # Added Volatility Information
                 )
