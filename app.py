@@ -1,6 +1,8 @@
 from flask import Flask, jsonify
 import ccxt
 import requests
+import pandas as pd
+import pandas_ta as ta
 import time
 import threading
 from datetime import datetime, timedelta
@@ -78,7 +80,27 @@ def calculate_dynamic_goals(price, strategy):
                 4, 8, 20, -5)
     return None
 
-# ✅ Function to scan for trading opportunities
+def get_technical_indicators(symbol):
+    try:
+        # Fetch 1-day historical OHLCV data for the token (last 100 days)
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe='1d', limit=100)
+        df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+
+        # ✅ Technical Indicators
+        df["rsi"] = ta.rsi(df["close"], length=14)  # Relative Strength Index
+        df["sma_50"] = ta.sma(df["close"], length=50)  # 50-day Simple Moving Average
+        df["sma_200"] = ta.sma(df["close"], length=200)  # 200-day Simple Moving Average
+        df[["bb_low", "bb_mid", "bb_high"]] = ta.bbands(df["close"], length=20)  # Bollinger Bands
+        df["macd"], df["macd_signal"], df["macd_hist"] = ta.macd(df["close"], fast=12, slow=26, signal=9).values.T  # MACD
+
+        return df.iloc[-1]  # Return the latest values
+    except Exception as e:
+        print(f"⚠️ Error fetching indicators for {symbol}: {e}")
+        return None
+
+
+# ✅ Updated `find_gems()` Function with Technical Analysis
 def find_gems():
     try:
         print("🔄 Fetching Binance Market Data...")
@@ -100,6 +122,11 @@ def find_gems():
 
             percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
+            # ✅ Fetch Technical Indicators for this Token
+            ta_data = get_technical_indicators(symbol)
+            if ta_data is None:
+                continue  # Skip if TA data is unavailable
+
             # ✅ Determine Volatility Level
             if abs(percent_change) > 10:
                 volatility = "🔴 *High Volatility*"
@@ -108,17 +135,27 @@ def find_gems():
             else:
                 volatility = "🟡 *Moderate Volatility*"
 
-            # ✅ Strategy Selection
+            # ✅ Strategy Selection with Technical Indicators
             strategy_used = None
-            if percent_change > 20:
+
+            # 📌 1. Momentum Breakout 🚀 (High RSI + MACD Bullish Crossover)
+            if percent_change > 20 and ta_data["rsi"] > 70 and ta_data["macd"] > ta_data["macd_signal"]:
                 strategy_used = "Momentum Breakout 🚀"
-            elif 10 < percent_change <= 20:
+
+            # 📌 2. Trend Continuation 📈 (Price above 50-SMA & 200-SMA)
+            elif 10 < percent_change <= 20 and ta_data["close"] > ta_data["sma_50"] > ta_data["sma_200"]:
                 strategy_used = "Trend Continuation 📈"
-            elif percent_change < -5:
+
+            # 📌 3. Reversal Pattern 🔄 (Low RSI + MACD Bearish)
+            elif percent_change < -5 and ta_data["rsi"] < 30 and ta_data["macd"] < ta_data["macd_signal"]:
                 strategy_used = "Reversal Pattern 🔄"
-            elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000:
+
+            # 📌 4. Consolidation Breakout ⏸➡🚀 (Price near BB lower band + High Volume)
+            elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000 and ta_data["close"] <= ta_data["bb_low"]:
                 strategy_used = "Consolidation Breakout ⏸➡🚀"
-            elif symbol in trending_coins and row['quoteVolume'] > 5000000:
+
+            # 📌 5. News & Social Trend 📰 (Trending CoinGecko + BB Breakout)
+            elif symbol in trending_coins and row['quoteVolume'] > 5000000 and ta_data["close"] >= ta_data["bb_high"]:
                 strategy_used = "News & Social Trend 📰"
 
             if strategy_used:
@@ -132,7 +169,9 @@ def find_gems():
                     f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
                     f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
                     f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
-                    f"📊 *Volatility:* {volatility}\n"  # Added Volatility Information
+                    f"📊 *Volatility:* {volatility}\n"
+                    f"📈 *RSI:* `{ta_data['rsi']:.2f}` | *MACD:* `{ta_data['macd']:.2f}`\n"
+                    f"📊 *50-SMA:* `{ta_data['sma_50']:.2f}` | *200-SMA:* `{ta_data['sma_200']:.2f}`\n"
                 )
 
                 send_telegram_alert(message)
