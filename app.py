@@ -1,13 +1,15 @@
 from flask import Flask, jsonify
 import ccxt
 import requests
-import numpy as np
+import numpy as np  # ✅ Import numpy BEFORE pandas_ta
 import pandas as pd
-import pandas_ta as ta
 import time
 import threading
 from datetime import datetime, timedelta
-import pytz  
+import pytz
+
+# ✅ Import pandas_ta last
+import pandas_ta as ta
 
 app = Flask(__name__)
 
