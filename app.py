@@ -83,6 +83,10 @@ def calculate_dynamic_goals(price, strategy):
                 4, 8, 20, -5)
     return None
 
+import pandas as pd
+import pandas_ta as ta
+
+# ✅ Function to fetch OHLCV (candlestick) data and apply technical indicators
 def get_technical_indicators(symbol):
     try:
         # Fetch 1-day historical OHLCV data for the token (last 100 days)
@@ -102,23 +106,28 @@ def get_technical_indicators(symbol):
         
         # ✅ Fix Bollinger Bands Assignment
         bb = ta.bbands(df["close"], length=20)
-        if bb is not None and len(bb.columns) == 3:  # Ensure BB returns valid values
+        if bb is not None and bb.shape[1] == 3:  # Ensure BB returns valid values
             df["bb_low"], df["bb_mid"], df["bb_high"] = bb.iloc[:, 0], bb.iloc[:, 1], bb.iloc[:, 2]
         else:
             df["bb_low"], df["bb_mid"], df["bb_high"] = None, None, None
 
         # ✅ Fix MACD Assignment
         macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
-        if macd is not None and len(macd.columns) >= 3:  # Ensure MACD returns 3 valid values
+        if macd is not None and macd.shape[1] >= 3:  # Ensure MACD returns 3 valid values
             df["macd"], df["macd_signal"], df["macd_hist"] = macd.iloc[:, 0], macd.iloc[:, 1], macd.iloc[:, 2]
         else:
             df["macd"], df["macd_signal"], df["macd_hist"] = None, None, None
+
+        # ✅ Check for any missing values and handle them
+        for col in ["rsi", "sma_50", "sma_200", "bb_low", "bb_mid", "bb_high", "macd", "macd_signal", "macd_hist"]:
+            if df[col].isnull().any():  # If any indicator is missing, skip this token
+                print(f"⚠️ Missing TA data for {symbol} - Skipping.")
+                return None
 
         return df.iloc[-1]  # Return the latest row of the DataFrame
     except Exception as e:
         print(f"⚠️ Error fetching indicators for {symbol}: {e}")
         return None
-
 
 # ✅ Updated `find_gems()` Function with Technical Analysis
 def find_gems():
@@ -150,11 +159,18 @@ def find_gems():
 
                 # ✅ Fetch Technical Indicators for this Token
                 print(f"📊 Fetching TA for {symbol}...")
+                # Fetch TA indicators
                 ta_data = get_technical_indicators(symbol)
-                
                 if ta_data is None:
                     print(f"⚠️ Skipping {symbol} due to missing TA data.")
                     continue  # Skip if TA data is unavailable
+                
+                # ✅ Ensure all indicators have valid float values
+                required_indicators = ["rsi", "sma_50", "sma_200", "bb_low", "bb_mid", "bb_high", "macd", "macd_signal", "macd_hist"]
+                if any(ta_data[ind] is None or not isinstance(ta_data[ind], float) for ind in required_indicators):
+                    print(f"⚠️ TA data for {symbol} contains None values - Skipping.")
+                    continue
+
 
                 # ✅ Determine Volatility Level
                 if abs(percent_change) > 10:
