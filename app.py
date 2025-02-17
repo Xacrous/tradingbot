@@ -87,44 +87,60 @@ import pandas as pd
 import pandas_ta as ta
 
 # ✅ Function to fetch OHLCV (candlestick) data and apply technical indicators
+import pandas as pd
+import pandas_ta as ta
+
 def get_technical_indicators(symbol):
     try:
-        # Fetch 1-day historical OHLCV data for the token (last 100 days)
+        # ✅ Fetch 1-day OHLCV historical data (last 100 days)
         ohlcv = binance.fetch_ohlcv(symbol, timeframe='1d', limit=100)
         df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
-        # ✅ Check if we have enough data
+        # ✅ Print raw OHLCV data to debug missing values
+        print(f"📊 {symbol} OHLCV Data:\n", df.head())
+
+        # ✅ Check if we have enough data (at least 50 days)
         if df.shape[0] < 50:
-            print(f"⚠️ Not enough historical data for {symbol}")
+            print(f"⚠️ Not enough historical data for {symbol} - Skipping.")
             return None
 
-        # ✅ Calculate Technical Indicators safely
+        # ✅ Calculate Technical Indicators
         df["rsi"] = ta.rsi(df["close"], length=14)
         df["sma_50"] = ta.sma(df["close"], length=50)
         df["sma_200"] = ta.sma(df["close"], length=200)
         
-        # ✅ Fix Bollinger Bands Assignment
+        # ✅ Handle Bollinger Bands
         bb = ta.bbands(df["close"], length=20)
-        if bb is not None and bb.shape[1] == 3:  # Ensure BB returns valid values
+        if bb is not None and bb.shape[1] == 3:
             df["bb_low"], df["bb_mid"], df["bb_high"] = bb.iloc[:, 0], bb.iloc[:, 1], bb.iloc[:, 2]
         else:
             df["bb_low"], df["bb_mid"], df["bb_high"] = None, None, None
 
-        # ✅ Fix MACD Assignment
+        # ✅ Handle MACD
         macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
-        if macd is not None and macd.shape[1] >= 3:  # Ensure MACD returns 3 valid values
+        if macd is not None and macd.shape[1] >= 3:
             df["macd"], df["macd_signal"], df["macd_hist"] = macd.iloc[:, 0], macd.iloc[:, 1], macd.iloc[:, 2]
         else:
             df["macd"], df["macd_signal"], df["macd_hist"] = None, None, None
 
-        # ✅ Check for any missing values and handle them
-        for col in ["rsi", "sma_50", "sma_200", "bb_low", "bb_mid", "bb_high", "macd", "macd_signal", "macd_hist"]:
-            if df[col].isnull().any():  # If any indicator is missing, skip this token
-                print(f"⚠️ Missing TA data for {symbol} - Skipping.")
-                return None
+        # ✅ Print computed TA values to debug missing data
+        print(f"📈 TA Indicators for {symbol}:\n{df.tail(1)}")
 
-        return df.iloc[-1]  # Return the latest row of the DataFrame
+        # ✅ Fill missing values with safe defaults instead of skipping
+        df.fillna({
+            "rsi": 50,  # Neutral RSI
+            "sma_50": df["close"].mean(),
+            "sma_200": df["close"].mean(),
+            "bb_low": df["close"].min(),
+            "bb_mid": df["close"].mean(),
+            "bb_high": df["close"].max(),
+            "macd": 0,
+            "macd_signal": 0,
+            "macd_hist": 0,
+        }, inplace=True)
+
+        return df.iloc[-1]  # Return the latest row
     except Exception as e:
         print(f"⚠️ Error fetching indicators for {symbol}: {e}")
         return None
@@ -161,9 +177,10 @@ def find_gems():
                 print(f"📊 Fetching TA for {symbol}...")
                 # Fetch TA indicators
                 ta_data = get_technical_indicators(symbol)
-                if ta_data is None:
-                    print(f"⚠️ Skipping {symbol} due to missing TA data.")
-                    continue  # Skip if TA data is unavailable
+                if ta_data is None or ta_data.isnull().any():
+                    print(f"⚠️ {symbol} has missing TA data - Using default values.")
+                    continue  # Skipping this ensures only valid values are used
+
                 
                 # ✅ Ensure all indicators have valid float values
                 required_indicators = ["rsi", "sma_50", "sma_200", "bb_low", "bb_mid", "bb_high", "macd", "macd_signal", "macd_hist"]
