@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 import ccxt
 import requests
+import numpy as np
 import pandas as pd
 import pandas_ta as ta
 import time
