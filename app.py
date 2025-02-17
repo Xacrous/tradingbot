@@ -127,82 +127,99 @@ def find_gems():
         market_data = binance.fetch_tickers()
         usdt_pairs = {symbol: data for symbol, data in market_data.items() if "/USDT" in symbol}
 
+        print(f"📊 Found {len(usdt_pairs)} USDT trading pairs.")
+
         trending_coins = get_trending_coins()
+        print(f"🔥 Trending Coins: {trending_coins}")
 
         signals = []
         today = datetime.now().date()
 
         for symbol, row in usdt_pairs.items():
-            if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
-                continue  
+            try:
+                if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
+                    print(f"⚠️ Skipping {symbol} due to missing data.")
+                    continue  
 
-            # ✅ Prevent duplicate signals for the same token on the same day
-            if symbol in sent_signals and sent_signals[symbol] == today:
-                continue  
+                # ✅ Prevent duplicate signals for the same token on the same day
+                if symbol in sent_signals and sent_signals[symbol] == today:
+                    print(f"🛑 {symbol} already sent today. Skipping.")
+                    continue  
 
-            percent_change = ((row['last'] - row['open']) / row['open']) * 100
+                percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
-            # ✅ Fetch Technical Indicators for this Token
-            ta_data = get_technical_indicators(symbol)
-            if ta_data is None:
-                continue  # Skip if TA data is unavailable
+                # ✅ Fetch Technical Indicators for this Token
+                print(f"📊 Fetching TA for {symbol}...")
+                ta_data = get_technical_indicators(symbol)
+                
+                if ta_data is None:
+                    print(f"⚠️ Skipping {symbol} due to missing TA data.")
+                    continue  # Skip if TA data is unavailable
 
-            # ✅ Determine Volatility Level
-            if abs(percent_change) > 10:
-                volatility = "🔴 *High Volatility*"
-            elif abs(percent_change) < 5:
-                volatility = "🟢 *Low Volatility*"
-            else:
-                volatility = "🟡 *Moderate Volatility*"
+                # ✅ Determine Volatility Level
+                if abs(percent_change) > 10:
+                    volatility = "🔴 *High Volatility*"
+                elif abs(percent_change) < 5:
+                    volatility = "🟢 *Low Volatility*"
+                else:
+                    volatility = "🟡 *Moderate Volatility*"
 
-            # ✅ Strategy Selection with Technical Indicators
-            strategy_used = None
+                # ✅ Strategy Selection with Technical Indicators
+                strategy_used = None
 
-            # 📌 1. Momentum Breakout 🚀 (High RSI + MACD Bullish Crossover)
-            if percent_change > 20 and ta_data["rsi"] > 70 and ta_data["macd"] > ta_data["macd_signal"]:
-                strategy_used = "Momentum Breakout 🚀"
+                # 📌 1. Momentum Breakout 🚀
+                if percent_change > 20 and ta_data["rsi"] > 70 and ta_data["macd"] > ta_data["macd_signal"]:
+                    strategy_used = "Momentum Breakout 🚀"
 
-            # 📌 2. Trend Continuation 📈 (Price above 50-SMA & 200-SMA)
-            elif 10 < percent_change <= 20 and ta_data["close"] > ta_data["sma_50"] > ta_data["sma_200"]:
-                strategy_used = "Trend Continuation 📈"
+                # 📌 2. Trend Continuation 📈
+                elif 10 < percent_change <= 20 and ta_data["close"] > ta_data["sma_50"] > ta_data["sma_200"]:
+                    strategy_used = "Trend Continuation 📈"
 
-            # 📌 3. Reversal Pattern 🔄 (Low RSI + MACD Bearish)
-            elif percent_change < -5 and ta_data["rsi"] < 30 and ta_data["macd"] < ta_data["macd_signal"]:
-                strategy_used = "Reversal Pattern 🔄"
+                # 📌 3. Reversal Pattern 🔄
+                elif percent_change < -5 and ta_data["rsi"] < 30 and ta_data["macd"] < ta_data["macd_signal"]:
+                    strategy_used = "Reversal Pattern 🔄"
 
-            # 📌 4. Consolidation Breakout ⏸➡🚀 (Price near BB lower band + High Volume)
-            elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000 and ta_data["close"] <= ta_data["bb_low"]:
-                strategy_used = "Consolidation Breakout ⏸➡🚀"
+                # 📌 4. Consolidation Breakout ⏸➡🚀
+                elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000 and ta_data["close"] <= ta_data["bb_low"]:
+                    strategy_used = "Consolidation Breakout ⏸➡🚀"
 
-            # 📌 5. News & Social Trend 📰 (Trending CoinGecko + BB Breakout)
-            elif symbol in trending_coins and row['quoteVolume'] > 5000000 and ta_data["close"] >= ta_data["bb_high"]:
-                strategy_used = "News & Social Trend 📰"
+                # 📌 5. News & Social Trend 📰
+                elif symbol in trending_coins and row['quoteVolume'] > 5000000 and ta_data["close"] >= ta_data["bb_high"]:
+                    strategy_used = "News & Social Trend 📰"
 
-            if strategy_used:
-                entry_price = row['last']
-                goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
+                if strategy_used:
+                    print(f"✅ Strategy Selected for {symbol}: {strategy_used}")
+                    entry_price = row['last']
+                    goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
-                message = (
-                    f"*{strategy_used}*\n"
-                    f"📌 *Token:* `{symbol}`\n"
-                    f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                    f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
-                    f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
-                    f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
-                    f"📊 *Volatility:* {volatility}\n"
-                    f"📈 *RSI:* `{ta_data['rsi']:.2f}` | *MACD:* `{ta_data['macd']:.2f}`\n"
-                    f"📊 *50-SMA:* `{ta_data['sma_50']:.2f}` | *200-SMA:* `{ta_data['sma_200']:.2f}`\n"
-                )
+                    message = (
+                        f"*{strategy_used}*\n"
+                        f"📌 *Token:* `{symbol}`\n"
+                        f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
+                        f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
+                        f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
+                        f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
+                        f"📊 *Volatility:* {volatility}\n"
+                        f"📈 *RSI:* `{ta_data['rsi']:.2f}` | *MACD:* `{ta_data['macd']:.2f}`\n"
+                        f"📊 *50-SMA:* `{ta_data['sma_50']:.2f}` | *200-SMA:* `{ta_data['sma_200']:.2f}`\n"
+                    )
 
-                send_telegram_alert(message)
-                sent_signals[symbol] = today  
-                signals.append(message)
+                    send_telegram_alert(message)
+                    sent_signals[symbol] = today  
+                    signals.append(message)
+                else:
+                    print(f"⏳ No valid strategy for {symbol}, skipping.")
 
+            except Exception as e:
+                print(f"⚠️ Error processing {symbol}: {e}")
+
+        print(f"✅ Scan completed. {len(signals)} signals sent.")
         return signals
 
     except Exception as e:
         print(f"⚠️ Error during scanning: {str(e)}")
         return []
+
 
 # ✅ Auto-Scanning Every 5 Minutes
 def auto_scan():
