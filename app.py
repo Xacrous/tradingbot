@@ -90,14 +90,31 @@ def get_technical_indicators(symbol):
         df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
-        # ✅ Technical Indicators
-        df["rsi"] = ta.rsi(df["close"], length=14)  # Relative Strength Index
-        df["sma_50"] = ta.sma(df["close"], length=50)  # 50-day Simple Moving Average
-        df["sma_200"] = ta.sma(df["close"], length=200)  # 200-day Simple Moving Average
-        df[["bb_low", "bb_mid", "bb_high"]] = ta.bbands(df["close"], length=20)  # Bollinger Bands
-        df["macd"], df["macd_signal"], df["macd_hist"] = ta.macd(df["close"], fast=12, slow=26, signal=9).values.T  # MACD
+        # ✅ Check if we have enough data
+        if df.shape[0] < 50:
+            print(f"⚠️ Not enough historical data for {symbol}")
+            return None
 
-        return df.iloc[-1]  # Return the latest values
+        # ✅ Calculate Technical Indicators safely
+        df["rsi"] = ta.rsi(df["close"], length=14)
+        df["sma_50"] = ta.sma(df["close"], length=50)
+        df["sma_200"] = ta.sma(df["close"], length=200)
+        
+        # ✅ Fix Bollinger Bands Assignment
+        bb = ta.bbands(df["close"], length=20)
+        if bb is not None and len(bb.columns) == 3:  # Ensure BB returns valid values
+            df["bb_low"], df["bb_mid"], df["bb_high"] = bb.iloc[:, 0], bb.iloc[:, 1], bb.iloc[:, 2]
+        else:
+            df["bb_low"], df["bb_mid"], df["bb_high"] = None, None, None
+
+        # ✅ Fix MACD Assignment
+        macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
+        if macd is not None and len(macd.columns) >= 3:  # Ensure MACD returns 3 valid values
+            df["macd"], df["macd_signal"], df["macd_hist"] = macd.iloc[:, 0], macd.iloc[:, 1], macd.iloc[:, 2]
+        else:
+            df["macd"], df["macd_signal"], df["macd_hist"] = None, None, None
+
+        return df.iloc[-1]  # Return the latest row of the DataFrame
     except Exception as e:
         print(f"⚠️ Error fetching indicators for {symbol}: {e}")
         return None
