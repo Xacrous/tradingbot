@@ -3,4 +3,5 @@ ccxt
 requests
 pytz
 pandas
+numpy  # Add this
 pandas-ta
