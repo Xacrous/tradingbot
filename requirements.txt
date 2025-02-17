@@ -2,3 +2,5 @@ Flask
 ccxt
 requests
 pytz
+pandas
+pandas-ta
