@@ -223,14 +223,18 @@ def find_gems():
                     goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
                     message = (
-                        f"*{strategy_used}*\n"
-                        f"📌 *Token:* `{symbol}`\n"
-                        f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
-                        f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
-                        f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
-                        f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
-                        f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
-                    )
+                                f"*{strategy_used}*\n"
+                                f"📌 *Token:* `{symbol}`\n"
+                                f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
+                                f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1:.2f}%) (Short-term)\n"
+                                f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2:.2f}%) (Mid-term)\n"
+                                f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3:.2f}%) (Long-term, based on 1-week chart)\n"
+                                f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss:.2f}%)\n"
+                                f"📊 *Volatility:* {volatility}\n"
+                                f"📈 *RSI:* `{ta_data['rsi']:.2f}` | *MACD:* `{ta_data['macd']:.2f}`\n"
+                                f"📊 *50-SMA:* `{ta_data['sma_50']:.2f}` | *200-SMA:* `{ta_data['sma_200']:.2f}`\n"
+                            )
+
 
                     send_telegram_alert(message)
                     sent_signals[symbol] = today  
