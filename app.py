@@ -203,6 +203,13 @@ def find_gems():
                 ta_data = get_technical_indicators(symbol)
                 if ta_data is None:
                     continue  
+                # ✅ Calculate Volatility Level
+                if abs(percent_change) > 10:
+                    volatility = "🔴 *High Volatility*"
+                elif abs(percent_change) < 5:
+                    volatility = "🟢 *Low Volatility*"
+                else:
+                    volatility = "🟡 *Moderate Volatility*"
 
                 # ✅ Strategy Selection (Same as Before)
                 strategy_used = None
