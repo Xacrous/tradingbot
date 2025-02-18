@@ -145,17 +145,47 @@ def get_technical_indicators(symbol):
         print(f"⚠️ Error fetching indicators for {symbol}: {e}")
         return None
 
+def check_candle_close_condition(symbol, strategy):
+    try:
+        # ✅ Fetch latest 1-day candle data
+        ohlcv = binance.fetch_ohlcv(symbol, timeframe='1d', limit=2)
+        if not ohlcv or len(ohlcv) < 2:
+            print(f"⚠️ Not enough OHLCV data for {symbol}")
+            return False
+
+        # ✅ Last closed candle data
+        prev_candle = ohlcv[-2]  # Get the previous fully closed candle
+        open_price, high_price, low_price, close_price, volume = prev_candle[1], prev_candle[2], prev_candle[3], prev_candle[4], prev_candle[5]
+
+        # ✅ Fetch Technical Indicators for Confirmation
+        ta_data = get_technical_indicators(symbol)
+        if ta_data is None:
+            return False
+
+        # ✅ Confirm Strategy at Candle Close
+        if strategy == "Momentum Breakout 🚀":
+            return close_price > open_price and ta_data["rsi"] > 70 and ta_data["macd"] > ta_data["macd_signal"]
+        elif strategy == "Trend Continuation 📈":
+            return close_price > ta_data["sma_50"] > ta_data["sma_200"]
+        elif strategy == "Reversal Pattern 🔄":
+            return close_price < open_price and ta_data["rsi"] < 30 and ta_data["macd"] < ta_data["macd_signal"]
+        elif strategy == "Consolidation Breakout ⏸➡🚀":
+            return abs(close_price - open_price) < 0.5 * (high_price - low_price) and close_price <= ta_data["bb_low"]
+        elif strategy == "News & Social Trend 📰":
+            return close_price >= ta_data["bb_high"]
+
+        return False
+    except Exception as e:
+        print(f"⚠️ Error checking candle close for {symbol}: {e}")
+        return False
+
 # ✅ Updated `find_gems()` Function with Technical Analysis
 def find_gems():
     try:
         print("🔄 Fetching Binance Market Data...")
         market_data = binance.fetch_tickers()
         usdt_pairs = {symbol: data for symbol, data in market_data.items() if "/USDT" in symbol}
-
-        print(f"📊 Found {len(usdt_pairs)} USDT trading pairs.")
-
         trending_coins = get_trending_coins()
-        print(f"🔥 Trending Coins: {trending_coins}")
 
         signals = []
         today = datetime.now().date()
@@ -163,65 +193,32 @@ def find_gems():
         for symbol, row in usdt_pairs.items():
             try:
                 if not all(k in row and row[k] is not None for k in ['quoteVolume', 'open', 'last']):
-                    print(f"⚠️ Skipping {symbol} due to missing data.")
                     continue  
 
-                # ✅ Prevent duplicate signals for the same token on the same day
                 if symbol in sent_signals and sent_signals[symbol] == today:
-                    print(f"🛑 {symbol} already sent today. Skipping.")
                     continue  
 
                 percent_change = ((row['last'] - row['open']) / row['open']) * 100
 
-                # ✅ Fetch Technical Indicators for this Token
-                print(f"📊 Fetching TA for {symbol}...")
-                # Fetch TA indicators
                 ta_data = get_technical_indicators(symbol)
-                if ta_data is None or ta_data.isnull().any():
-                    print(f"⚠️ {symbol} has missing TA data - Using default values.")
-                    continue  # Skipping this ensures only valid values are used
+                if ta_data is None:
+                    continue  
 
-                
-                # ✅ Ensure all indicators have valid float values
-                required_indicators = ["rsi", "sma_50", "sma_200", "bb_low", "bb_mid", "bb_high", "macd", "macd_signal", "macd_hist"]
-                if any(ta_data[ind] is None or not isinstance(ta_data[ind], float) for ind in required_indicators):
-                    print(f"⚠️ TA data for {symbol} contains None values - Skipping.")
-                    continue
-
-
-                # ✅ Determine Volatility Level
-                if abs(percent_change) > 10:
-                    volatility = "🔴 *High Volatility*"
-                elif abs(percent_change) < 5:
-                    volatility = "🟢 *Low Volatility*"
-                else:
-                    volatility = "🟡 *Moderate Volatility*"
-
-                # ✅ Strategy Selection with Technical Indicators
+                # ✅ Strategy Selection (Same as Before)
                 strategy_used = None
-
-                # 📌 1. Momentum Breakout 🚀
                 if percent_change > 20 and ta_data["rsi"] > 70 and ta_data["macd"] > ta_data["macd_signal"]:
                     strategy_used = "Momentum Breakout 🚀"
-
-                # 📌 2. Trend Continuation 📈
-                elif 10 < percent_change <= 20 and ta_data["close"] > ta_data["sma_50"] > ta_data["sma_200"]:
+                elif 10 < percent_change <= 20 and row["last"] > ta_data["sma_50"] > ta_data["sma_200"]:
                     strategy_used = "Trend Continuation 📈"
-
-                # 📌 3. Reversal Pattern 🔄
                 elif percent_change < -5 and ta_data["rsi"] < 30 and ta_data["macd"] < ta_data["macd_signal"]:
                     strategy_used = "Reversal Pattern 🔄"
-
-                # 📌 4. Consolidation Breakout ⏸➡🚀
-                elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000 and ta_data["close"] <= ta_data["bb_low"]:
+                elif abs(percent_change) < 3 and row['quoteVolume'] > 2000000 and row["last"] <= ta_data["bb_low"]:
                     strategy_used = "Consolidation Breakout ⏸➡🚀"
-
-                # 📌 5. News & Social Trend 📰
-                elif symbol in trending_coins and row['quoteVolume'] > 5000000 and ta_data["close"] >= ta_data["bb_high"]:
+                elif symbol in trending_coins and row['quoteVolume'] > 5000000 and row["last"] >= ta_data["bb_high"]:
                     strategy_used = "News & Social Trend 📰"
 
-                if strategy_used:
-                    print(f"✅ Strategy Selected for {symbol}: {strategy_used}")
+                # ✅ NEW: Confirm at Candle Close Before Sending Signal
+                if strategy_used and check_candle_close_condition(symbol, strategy_used):
                     entry_price = row['last']
                     goal_1, goal_2, goal_3, stop_loss, p1, p2, p3, p_loss = calculate_dynamic_goals(entry_price, strategy_used)
 
@@ -231,22 +228,17 @@ def find_gems():
                         f"💰 *Entry Price:* `{entry_price:.4f} USDT`\n"
                         f"🎯 *Goal 1:* `{goal_1} USDT` (+{p1}%) (Short-term)\n"
                         f"🎯 *Goal 2:* `{goal_2} USDT` (+{p2}%) (Mid-term)\n"
+                        f"🎯 *Goal 3:* `{goal_3} USDT` (+{p3}%) (Long-term)\n"
                         f"⛔ *Stop Loss:* `{stop_loss} USDT` ({p_loss}%)\n"
-                        f"📊 *Volatility:* {volatility}\n"
-                        f"📈 *RSI:* `{ta_data['rsi']:.2f}` | *MACD:* `{ta_data['macd']:.2f}`\n"
-                        f"📊 *50-SMA:* `{ta_data['sma_50']:.2f}` | *200-SMA:* `{ta_data['sma_200']:.2f}`\n"
                     )
 
                     send_telegram_alert(message)
                     sent_signals[symbol] = today  
                     signals.append(message)
-                else:
-                    print(f"⏳ No valid strategy for {symbol}, skipping.")
 
             except Exception as e:
                 print(f"⚠️ Error processing {symbol}: {e}")
 
-        print(f"✅ Scan completed. {len(signals)} signals sent.")
         return signals
 
     except Exception as e:
